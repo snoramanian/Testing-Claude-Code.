@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Welcome</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>Welcome, <span id="who">friend</span>!</h1>
+    <p>You are now signed in.</p>
+    <button id="logout">Log out</button>
+  </main>
+  <script>
+    (function () {
+      const SESSION_KEY = 'demo.session';
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) { window.location.href = 'index.html'; return; }
+      try {
+        const session = JSON.parse(raw);
+        document.getElementById('who').textContent = session.username;
+      } catch (_) {
+        sessionStorage.removeItem(SESSION_KEY);
+        window.location.href = 'index.html';
+      }
+      document.getElementById('logout').addEventListener('click', function () {
+        sessionStorage.removeItem(SESSION_KEY);
+        window.location.href = 'index.html';
+      });
+    })();
+  </script>
+</body>
+</html>
