@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Web Scraper &amp; Keyword Finder</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <h1>Web Scraper &amp; Keyword Finder</h1>
+      <p class="tagline">Paste a URL, drop in a few words, and find every match on the page.</p>
+    </header>
+
+    <form id="scrape-form" class="card" autocomplete="off">
+      <label class="field">
+        <span class="label">URL to scrape</span>
+        <input
+          type="url"
+          id="url"
+          name="url"
+          placeholder="https://example.com/article"
+          required
+        />
+      </label>
+
+      <label class="field">
+        <span class="label">Keywords <em>(comma-separated)</em></span>
+        <input
+          type="text"
+          id="keywords"
+          name="keywords"
+          placeholder="machine learning, python, AI"
+          required
+        />
+      </label>
+
+      <button type="submit" id="submit-btn">Scan page</button>
+    </form>
+
+    <section id="status" class="status hidden" aria-live="polite"></section>
+
+    <section id="results" class="results hidden">
+      <header class="results-header">
+        <h2 id="page-title"></h2>
+        <p class="meta">
+          <a id="page-url" target="_blank" rel="noopener noreferrer"></a>
+          <span class="dot">•</span>
+          <span id="word-count"></span> words scanned
+          <span class="dot">•</span>
+          <strong id="total-matches"></strong> total matches
+        </p>
+      </header>
+      <ul id="keyword-list" class="keyword-list"></ul>
+    </section>
+
+    <footer class="foot">
+      Be a polite scraper — respect each site's robots.txt and terms of service.
+    </footer>
+  </main>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
