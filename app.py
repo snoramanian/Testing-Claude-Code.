@@ -11,9 +11,10 @@ app = Flask(__name__)
 REQUEST_TIMEOUT = 15
 MAX_CONTENT_BYTES = 5 * 1024 * 1024
 USER_AGENT = (
-    "Mozilla/5.0 (compatible; KeywordFinderBot/1.0; "
-    "+https://github.com/snoramanian/testing-claude-code.)"
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
+HOSTNAME_RE = re.compile(r"^[A-Za-z0-9._\-:\[\]]+$")
 SNIPPET_RADIUS = 60
 MAX_SNIPPETS_PER_KEYWORD = 5
 
@@ -32,7 +33,9 @@ def is_valid_http_url(url: str) -> bool:
         parsed = urlparse(url)
     except ValueError:
         return False
-    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return False
+    return bool(HOSTNAME_RE.match(parsed.hostname))
 
 
 def parse_keywords(raw: str) -> list[str]:
