@@ -1,14 +1,10 @@
-const form = document.getElementById("scrape-form");
-const urlInput = document.getElementById("url");
+const form = document.getElementById("search-form");
 const keywordsInput = document.getElementById("keywords");
 const submitBtn = document.getElementById("submit-btn");
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
-const pageTitleEl = document.getElementById("page-title");
-const pageUrlEl = document.getElementById("page-url");
-const wordCountEl = document.getElementById("word-count");
-const totalMatchesEl = document.getElementById("total-matches");
-const keywordListEl = document.getElementById("keyword-list");
+const resultsHeadingEl = document.getElementById("results-heading");
+const resultListEl = document.getElementById("result-list");
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
@@ -20,10 +16,15 @@ function escapeHtml(str) {
   })[c]);
 }
 
-function highlight(snippet, keyword) {
-  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(${escapedKeyword})`, "gi");
-  return escapeHtml(snippet).replace(re, "<mark>$1</mark>");
+function highlight(text, keywords) {
+  let escaped = escapeHtml(text);
+  for (const kw of keywords) {
+    if (!kw) continue;
+    const escKw = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(${escKw})`, "gi");
+    escaped = escaped.replace(re, "<mark>$1</mark>");
+  }
+  return escaped;
 }
 
 function setStatus(message, kind) {
@@ -38,49 +39,43 @@ function clearStatus() {
 }
 
 function renderResults(data) {
-  pageTitleEl.textContent = data.title || "(no page title)";
-  pageUrlEl.textContent = data.url;
-  pageUrlEl.href = data.url;
-  wordCountEl.textContent = data.word_count.toLocaleString();
-  totalMatchesEl.textContent = data.total_matches.toLocaleString();
-
-  keywordListEl.innerHTML = "";
-  for (const item of data.results) {
+  const noun = data.count === 1 ? "result" : "results";
+  resultsHeadingEl.textContent = `${data.count} ${noun} for "${data.query}"`;
+  resultListEl.innerHTML = "";
+  if (!data.results.length) {
     const li = document.createElement("li");
-    li.className = "keyword";
-    const pillClass = item.count === 0 ? "count-pill zero" : "count-pill";
-    const snippetsHtml = item.snippets.length
-      ? `<ul class="snippets">${item.snippets
-          .map((s) => `<li>${highlight(s, item.keyword)}</li>`)
-          .join("")}</ul>`
-      : `<p class="no-hits">No occurrences found.</p>`;
+    li.className = "no-hits";
+    li.textContent = "No pages matched.";
+    resultListEl.appendChild(li);
+  }
+  for (const r of data.results) {
+    const li = document.createElement("li");
+    li.className = "result";
+    const safeUrl = escapeHtml(r.url);
     li.innerHTML = `
-      <div class="keyword-head">
-        <span class="keyword-name">${escapeHtml(item.keyword)}</span>
-        <span class="${pillClass}">${item.count} match${item.count === 1 ? "" : "es"}</span>
-      </div>
-      ${snippetsHtml}
+      <a class="result-title" href="${safeUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>
+      <a class="result-url" href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>
+      <p class="result-snippet">${highlight(r.snippet, data.keywords)}</p>
     `;
-    keywordListEl.appendChild(li);
+    resultListEl.appendChild(li);
   }
   resultsEl.classList.remove("hidden");
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const url = urlInput.value.trim();
   const keywords = keywordsInput.value.trim();
-  if (!url || !keywords) return;
+  if (!keywords) return;
 
   resultsEl.classList.add("hidden");
-  setStatus("Fetching and scanning the page…", "loading");
+  setStatus("Searching…", "loading");
   submitBtn.disabled = true;
 
   try {
-    const response = await fetch("/api/scrape", {
+    const response = await fetch("/api/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, keywords }),
+      body: JSON.stringify({ keywords }),
     });
     const data = await response.json();
     if (!response.ok) {

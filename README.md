@@ -1,16 +1,16 @@
-# Web Scraper & Keyword Finder
+# Keyword Finder
 
-A small Flask web app: paste a URL, list a few keywords, and the server fetches
-the page, strips boilerplate, and reports how many times each keyword appears —
-with surrounding context snippets.
+A small Flask web app: type a few keywords, and the server queries
+DuckDuckGo's public search and returns the pages that talk about those
+keywords — titles, URLs, and snippets with the keywords highlighted.
 
 ## Features
 
-- Server-side scraping with `requests` + `BeautifulSoup` (no browser CORS issues)
-- Case-insensitive keyword matching with highlighted context snippets
-- URL normalization (adds `http://` if missing), HTTPS support, redirect following
-- 5 MB page-size cap, 15 s timeout, content-type guard (HTML/XML only)
-- Clean responsive UI
+- Single-input UI: just type keywords (comma-separated or freeform)
+- Server-side search against DuckDuckGo's HTML endpoint (no API key)
+- Top 10 results with title, URL, and highlighted snippet
+- Case-insensitive keyword highlighting in snippets
+- Vercel-ready (`api/index.py` + `vercel.json`)
 
 ## Run locally
 
@@ -25,37 +25,39 @@ Then open http://localhost:5000.
 
 ## Use
 
-1. Enter a URL (e.g. `https://en.wikipedia.org/wiki/Web_scraping`).
-2. Enter keywords separated by commas (e.g. `python, crawler, parser`).
-3. Click **Scan page**.
+1. Type your keywords (e.g. `python web scraping` or `machine learning, python`).
+2. Click **Find pages**.
 
-You'll see total match counts, per-keyword counts, and up to 5 highlighted
-context snippets per keyword.
+You'll see up to 10 matching pages with the keywords highlighted in each snippet.
 
 ## API
 
-`POST /api/scrape`
+`POST /api/search`
 
 ```json
-{ "url": "https://example.com", "keywords": "alpha, beta" }
+{ "keywords": "python web scraping" }
 ```
 
 Response:
 
 ```json
 {
-  "url": "https://example.com/",
-  "title": "Example Domain",
-  "word_count": 28,
-  "total_matches": 1,
+  "query": "python web scraping",
+  "keywords": ["python", "web scraping"],
+  "count": 2,
   "results": [
-    { "keyword": "alpha", "count": 0, "snippets": [] },
-    { "keyword": "beta",  "count": 1, "snippets": ["…in beta release…"] }
+    {
+      "url": "https://example.com/article",
+      "title": "Intro to web scraping with Python",
+      "snippet": "Learn how to scrape data using Python and BeautifulSoup..."
+    }
   ]
 }
 ```
 
 ## Notes
 
-Be a polite scraper — honor each site's robots.txt and terms of service. This
-tool is meant for small, ad-hoc lookups, not bulk crawling.
+- Results come from DuckDuckGo's public HTML search. If you hit rate
+  limits in production, swap in a real search API (Google Custom Search,
+  Bing, SerpAPI).
+- Be a polite user — don't hammer the search endpoint in a loop.

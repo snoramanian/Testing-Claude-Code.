@@ -74,7 +74,6 @@ html, body {
   font-weight: 400;
 }
 
-input[type="url"],
 input[type="text"] {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -127,83 +126,53 @@ button:disabled { opacity: 0.65; cursor: not-allowed; }
 }
 
 .results-header h2 {
-  margin: 0 0 6px;
+  margin: 0 0 14px;
   font-size: 1.3rem;
 }
 
-.meta {
-  margin: 0 0 18px;
-  font-size: 0.92rem;
-  color: var(--muted);
-  word-break: break-all;
-}
-
-.meta a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.meta a:hover { text-decoration: underline; }
-.dot { margin: 0 6px; }
-
-.keyword-list {
+.result-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.keyword {
+.result {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
   background: #f8fafc;
-}
-
-.keyword-head {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.keyword-name {
+.result-title {
+  font-size: 1.05rem;
   font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
   word-break: break-word;
 }
 
-.count-pill {
-  display: inline-block;
-  background: var(--accent);
-  color: white;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  flex-shrink: 0;
+.result-title:hover { text-decoration: underline; }
+
+.result-url {
+  font-size: 0.82rem;
+  color: #15803d;
+  text-decoration: none;
+  word-break: break-all;
 }
 
-.count-pill.zero { background: #94a3b8; }
+.result-url:hover { text-decoration: underline; }
 
-.snippets {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.snippets li {
-  background: white;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  line-height: 1.45;
+.result-snippet {
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 mark {
