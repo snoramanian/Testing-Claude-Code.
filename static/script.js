@@ -47,8 +47,8 @@ function clearStatus() {
   statusEl.className = "status hidden";
 }
 
-function renderPagination(page, hasMore) {
-  pageLabelEl.textContent = `Page ${page}`;
+function renderPagination(page, totalPages, hasMore) {
+  pageLabelEl.textContent = `Page ${page} of ${totalPages}`;
   prevBtn.disabled = page <= 1;
   nextBtn.disabled = !hasMore;
   paginationEl.classList.remove("hidden");
@@ -59,9 +59,10 @@ function renderResults(data) {
   const endRank = startRank + data.count - 1;
   const noun = data.count === 1 ? "result" : "results";
   resultsHeadingEl.textContent =
-    `Page ${data.page} · ${data.count} ${noun} (#${startRank}–#${endRank}) for "${data.query}"`;
+    `Page ${data.page} of ${data.total_pages} · ${data.count} ${noun} (#${startRank}–#${endRank}) for "${data.query}"`;
   resultsMetaEl.textContent =
-    `Across ${data.unique_domains} unique domain${data.unique_domains === 1 ? "" : "s"} · ` +
+    `${data.total_results} total result${data.total_results === 1 ? "" : "s"} · ` +
+    `${data.unique_domains} unique domain${data.unique_domains === 1 ? "" : "s"} on this page · ` +
     `${data.pages_fetched} search page${data.pages_fetched === 1 ? "" : "s"} fetched in parallel`;
 
   resultListEl.innerHTML = "";
@@ -92,7 +93,7 @@ function renderResults(data) {
       resultListEl.appendChild(li);
     }
   }
-  renderPagination(data.page, data.has_more);
+  renderPagination(data.page, data.total_pages, data.has_more);
   resultsEl.classList.remove("hidden");
 }
 
