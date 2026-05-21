@@ -2,7 +2,11 @@
 
 Takes a list of keywords and returns the top web pages that contain
 those keywords, sourced from DuckDuckGo's public HTML search endpoint.
+Fetches multiple result pages in parallel to surface up to 50 results
+per query, and enriches each result with rank, domain, display URL,
+favicon, and snippet length.
 """
+import concurrent.futures
 import re
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -18,7 +22,8 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 SEARCH_URL = "https://html.duckduckgo.com/html/"
-MAX_RESULTS = 10
+MAX_RESULTS = 50
+PAGE_OFFSETS = (0, 30, 60)  # DDG returns ~25-30 organic results per page
 
 
 def parse_keywords(raw: str) -> list[str]:
@@ -60,8 +65,6 @@ def parse_ddg_results(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     out: list[dict] = []
     for result in soup.select(".result"):
-        if len(out) >= MAX_RESULTS:
-            break
         link = result.select_one(".result__a")
         snippet = result.select_one(".result__snippet")
         if not link:
@@ -78,20 +81,61 @@ def parse_ddg_results(html: str) -> list[dict]:
     return out
 
 
-def search_duckduckgo(query: str) -> list[dict]:
+def fetch_one_page(query: str, offset: int) -> list[dict]:
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": "text/html,application/xhtml+xml",
     }
+    data = {"q": query}
+    if offset > 0:
+        data["s"] = str(offset)
     resp = requests.post(
         SEARCH_URL,
-        data={"q": query},
+        data=data,
         headers=headers,
         timeout=REQUEST_TIMEOUT,
         allow_redirects=True,
     )
     resp.raise_for_status()
     return parse_ddg_results(resp.text)
+
+
+def search_duckduckgo(query: str) -> list[dict]:
+    """Fetch result pages in parallel, dedupe by URL, return up to MAX_RESULTS."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(PAGE_OFFSETS)) as ex:
+        pages = list(ex.map(lambda off: fetch_one_page(query, off), PAGE_OFFSETS))
+
+    seen: set[str] = set()
+    merged: list[dict] = []
+    for page in pages:
+        for r in page:
+            if r["url"] in seen:
+                continue
+            seen.add(r["url"])
+            merged.append(r)
+            if len(merged) >= MAX_RESULTS:
+                return merged
+    return merged
+
+
+def enrich_result(r: dict, rank: int) -> dict:
+    parsed = urlparse(r["url"])
+    domain = parsed.hostname or ""
+    if domain.startswith("www."):
+        domain = domain[4:]
+    path = parsed.path or ""
+    display_url = domain + (path if path and path != "/" else "")
+    snippet = r.get("snippet", "")
+    return {
+        "rank": rank,
+        "url": r["url"],
+        "title": r["title"],
+        "snippet": snippet,
+        "domain": domain,
+        "display_url": display_url,
+        "favicon": f"https://icons.duckduckgo.com/ip3/{domain}.ico" if domain else "",
+        "snippet_length": len(snippet),
+    }
 
 
 @app.route("/")
@@ -109,7 +153,7 @@ def search():
 
     query = " ".join(keywords)
     try:
-        results = search_duckduckgo(query)
+        raw_results = search_duckduckgo(query)
     except requests.exceptions.Timeout:
         return jsonify({"error": "The search timed out."}), 504
     except requests.exceptions.SSLError:
@@ -122,11 +166,16 @@ def search():
     except requests.exceptions.RequestException as exc:
         return jsonify({"error": f"Search failed: {exc}"}), 502
 
+    enriched = [enrich_result(r, i + 1) for i, r in enumerate(raw_results)]
+    domains = sorted({r["domain"] for r in enriched if r["domain"]})
+
     return jsonify({
         "query": query,
         "keywords": keywords,
-        "count": len(results),
-        "results": results,
+        "count": len(enriched),
+        "pages_fetched": len(PAGE_OFFSETS),
+        "unique_domains": len(domains),
+        "results": enriched,
     })
 
 
