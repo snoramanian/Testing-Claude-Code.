@@ -1,10 +1,10 @@
-"""Flask keyword-driven web search.
+"""Flask keyword-driven web search with pagination.
 
 Takes a list of keywords and returns the top web pages that contain
 those keywords, sourced from DuckDuckGo's public HTML search endpoint.
-Fetches multiple result pages in parallel to surface up to 50 results
-per query, and enriches each result with rank, domain, display URL,
-favicon, and snippet length.
+Returns 50 results per page; supports requesting page 2, 3, ... up to
+MAX_PAGE to surface more results. Each result is enriched with rank,
+domain, display URL, favicon, and snippet length.
 """
 import concurrent.futures
 import re
@@ -22,8 +22,12 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 SEARCH_URL = "https://html.duckduckgo.com/html/"
-MAX_RESULTS = 50
-PAGE_OFFSETS = (0, 30, 60)  # DDG returns ~25-30 organic results per page
+RESULTS_PER_PAGE = 50
+DDG_PAGE_SIZE = 30
+MAX_PAGE = 4                          # cap page param to prevent abuse
+MAX_DDG_FETCHES_PER_REQUEST = 8       # at most 8 upstream fetches per UI page
+DEDUP_BUFFER = 30                     # extra raw rows beyond N*50 to survive dedup
+MAX_PARALLEL_FETCHES = 5              # cap thread-pool size
 
 
 def parse_keywords(raw: str) -> list[str]:
@@ -100,22 +104,45 @@ def fetch_one_page(query: str, offset: int) -> list[dict]:
     return parse_ddg_results(resp.text)
 
 
-def search_duckduckgo(query: str) -> list[dict]:
-    """Fetch result pages in parallel, dedupe by URL, return up to MAX_RESULTS."""
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(PAGE_OFFSETS)) as ex:
-        pages = list(ex.map(lambda off: fetch_one_page(query, off), PAGE_OFFSETS))
+def offsets_for_page(page: int) -> list[int]:
+    """Return DDG offsets needed to surface UI page N.
+
+    UI page N wants global ranks (N-1)*50+1 .. N*50, which after dedup we slice
+    from the merged result list. We fetch enough DDG pages (each ~30 results)
+    to cover that rank range plus a buffer for dedup loss, capped at
+    MAX_DDG_FETCHES_PER_REQUEST.
+    """
+    needed_raw = page * RESULTS_PER_PAGE + DEDUP_BUFFER
+    count = (needed_raw + DDG_PAGE_SIZE - 1) // DDG_PAGE_SIZE
+    count = min(count, MAX_DDG_FETCHES_PER_REQUEST)
+    return [i * DDG_PAGE_SIZE for i in range(count)]
+
+
+def search_duckduckgo(query: str, page: int) -> tuple[list[dict], int, bool]:
+    """Fetch upstream pages, dedupe, return (slice_for_page, fetches_used, has_more)."""
+    offsets = offsets_for_page(page)
+    fetches_used = len(offsets)
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(len(offsets), MAX_PARALLEL_FETCHES)
+    ) as ex:
+        pages = list(ex.map(lambda off: fetch_one_page(query, off), offsets))
 
     seen: set[str] = set()
     merged: list[dict] = []
-    for page in pages:
-        for r in page:
+    for p in pages:
+        for r in p:
             if r["url"] in seen:
                 continue
             seen.add(r["url"])
             merged.append(r)
-            if len(merged) >= MAX_RESULTS:
-                return merged
-    return merged
+
+    start = (page - 1) * RESULTS_PER_PAGE
+    end = start + RESULTS_PER_PAGE
+    page_slice = merged[start:end]
+    # has_more if we filled this page AND there are unrendered results beyond it,
+    # AND we're not already at MAX_PAGE.
+    has_more = len(page_slice) >= RESULTS_PER_PAGE and len(merged) > end and page < MAX_PAGE
+    return page_slice, fetches_used, has_more
 
 
 def enrich_result(r: dict, rank: int) -> dict:
@@ -151,9 +178,15 @@ def search():
     if not keywords:
         return jsonify({"error": "Please provide at least one keyword."}), 400
 
+    try:
+        page = int(data.get("page") or 1)
+    except (TypeError, ValueError):
+        page = 1
+    page = max(1, min(page, MAX_PAGE))
+
     query = " ".join(keywords)
     try:
-        raw_results = search_duckduckgo(query)
+        raw_results, fetches_used, has_more = search_duckduckgo(query, page)
     except requests.exceptions.Timeout:
         return jsonify({"error": "The search timed out."}), 504
     except requests.exceptions.SSLError:
@@ -166,14 +199,18 @@ def search():
     except requests.exceptions.RequestException as exc:
         return jsonify({"error": f"Search failed: {exc}"}), 502
 
-    enriched = [enrich_result(r, i + 1) for i, r in enumerate(raw_results)]
+    rank_offset = (page - 1) * RESULTS_PER_PAGE
+    enriched = [enrich_result(r, rank_offset + i + 1) for i, r in enumerate(raw_results)]
     domains = sorted({r["domain"] for r in enriched if r["domain"]})
 
     return jsonify({
         "query": query,
         "keywords": keywords,
+        "page": page,
+        "max_page": MAX_PAGE,
+        "has_more": has_more,
         "count": len(enriched),
-        "pages_fetched": len(PAGE_OFFSETS),
+        "pages_fetched": fetches_used,
         "unique_domains": len(domains),
         "results": enriched,
     })

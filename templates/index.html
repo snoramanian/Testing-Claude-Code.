@@ -10,7 +10,7 @@
   <main class="container">
     <header class="hero">
       <h1>Keyword Finder</h1>
-      <p class="tagline">Drop in a few words. Find up to 50 pages that talk about them.</p>
+      <p class="tagline">Drop in a few words. 50 results per page, paginated for more.</p>
     </header>
 
     <form id="search-form" class="card" autocomplete="off">
@@ -36,10 +36,15 @@
         <p id="results-meta" class="results-meta"></p>
       </header>
       <ul id="result-list" class="result-list"></ul>
+      <nav id="pagination" class="pagination hidden" aria-label="Result pages">
+        <button type="button" id="prev-btn" class="page-btn">← Previous</button>
+        <span id="page-label" class="page-label">Page 1</span>
+        <button type="button" id="next-btn" class="page-btn">Next →</button>
+      </nav>
     </section>
 
     <footer class="foot">
-      <span class="version-badge">build: keyword-finder-v3 · 50 results</span><br />
+      <span class="version-badge">build: keyword-finder-v4 · paginated</span><br />
       Results sourced from DuckDuckGo's public search.
     </footer>
   </main>
