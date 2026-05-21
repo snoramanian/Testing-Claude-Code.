@@ -195,6 +195,17 @@ mark {
   font-size: 0.85rem;
 }
 
+.version-badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  margin-bottom: 6px;
+}
+
 .hidden { display: none; }
 
 @media (max-width: 540px) {
